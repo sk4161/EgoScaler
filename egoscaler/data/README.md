@@ -57,11 +57,15 @@ conda install -c open3d-admin -c conda-forge open3d==0.18.0
 
 2. Install third party
 ```bash
-# Install llama3
-cd egoscaler/data/third_party
-
-git clone https://github.com/meta-llama/llama3.git
-cd llama3
+# Install LLaMA3
+cd egoscaler/data/third_party/llama3
 pip install -e .
 
+# Install SpaTracker
+cd ../SpaTracker
+pip install -e .
+
+# Install Depth Anything
+cd ../Depth-Anything-V2
+pip install -e .
 ```
