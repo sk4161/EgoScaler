@@ -71,9 +71,16 @@ pip install -e .
 ```
 
 ## Training Dataset Construction
-1. Obtain Candidates
+1. **Obtain Candidates**: Extracting candidates of dataset instances and format basic information in unified mannar.
 ```bash
+bash scripts/1_get_cands.sh
+```
 
+2. **Filter Candidates**: Filter out unsuitable candidates (e.g., talking/walking scenarios) using both rule-based and LLaMA3-70B-Instruct-based methods.
+
+```bash
+# Adjust --nproc_per_node and batch size according to your environment
+bash scripts/2_filter_cands.sh
 ```
 
 
