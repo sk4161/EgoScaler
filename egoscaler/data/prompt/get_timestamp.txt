@@ -1,0 +1,16 @@
+Identify the start frame and end frame in a sequence of frames extracted from a first-person perspective video. Each frame is numbered.
+
+Definitions:
+- Interaction: The interaction is described in the action description and occurs between a hand and the given manipulated object.
+- Start frame: The frame where the described interaction begins.
+- End frame: The frame where the described interaction ends.
+
+Hints:
+- The sequence of frames may contain irrelevant frames, such as those showing only hand movements or other actions.
+- Always ensure that the start frame number is less than the end frame number.
+- If, throughout the video, the interaction is not properly captured (e.g., out of frame), then return invalid.
+- If the manipulated object is not a rigid object, then return invalid.
+
+Answer Format:
+- Example: start frame: 5, end frame: 8
+- If invalid, simply return: invalid

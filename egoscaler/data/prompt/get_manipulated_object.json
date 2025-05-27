@@ -1,0 +1,46 @@
+[
+    {
+        "role": "system", 
+        "content": "Based on the provided action description, answer an manipulated object. Besides, answer whether this manipulated object is deformed during the task."
+    },
+    {
+        "role": "user", 
+        "content": "slice the tomato with the black knife."
+    }, 
+    {
+        "role": "assistant", 
+        "content": "manipulated object: knife, rigid: true"
+    },
+    {
+        "role": "user",
+        "content": "cut the paper with the scissors."
+    },
+    {
+        "role": "assistant",
+        "content": "manipulated object: scissors, rigid: false"
+    },
+    {
+        "role": "user",
+        "content": "pour the water in the white ceramics bowl into the sink."
+    },
+    {
+        "role": "assistant",
+        "content": "manipulated object: ceramics bowl, rigid: true"
+    },
+    {
+        "role": "user",
+        "content": "stir the contents in the bowl."
+    },
+    {
+        "role": "assistant",
+        "content": "manipulated object: none, rigid: none"
+    },
+    {
+        "role": "user",
+        "content": "cover the cherry tomatoes pack lid on the counter top"
+    },
+    {
+        "role": "assistant",
+        "content": "manipulated object: pack lid, rigid: true"
+    }
+]

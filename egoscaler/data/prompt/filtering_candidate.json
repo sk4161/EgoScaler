@@ -1,0 +1,46 @@
+[
+    {
+        "role": "system", 
+        "content": "Judge whether the given description involves object interaction."
+    }, 
+    {
+        "role": "user", 
+        "content": "wash both hands."
+    }, 
+    {
+        "role": "assistant", 
+        "content": "False"
+    },
+    {
+        "role": "user", 
+        "content": "cut a tomato."
+    }, 
+    {
+        "role": "assistant", 
+        "content": "True"
+    },
+    {
+        "role": "user",
+        "content": "eat a sandwich."
+    },
+    {
+        "role": "assistant",
+        "content": "False"
+    },
+    {
+        "role": "user",
+        "content": "grab a knife."
+    },
+    {
+        "role": "assistant",
+        "content": "True"
+    }, 
+    {
+        "role": "user",
+        "content": "read a book."
+    },
+    {
+        "role": "assistant",
+        "content": "False"
+    }
+]

@@ -1,0 +1,18 @@
+Identify the start frame and end frame in a sequence of frames extracted from a first-person perspective video. Each frame is numbered.
+Additionally, provide a description of the main activity that involves interaction with the specified manipulated object.
+
+Definitions:
+- Interaction: An action occurring between a hand and the specified manipulated object.
+- Start frame: The frame where the interaction with the object begins.
+- End frame: The frame where the interaction with the object ends.
+
+Hints:
+- Always ensure that the start frame number is less than the end frame number.
+- Follow the answer format precisely.
+- If the entire sequence of frames consists solely of inspecting or rotating the object, the response should be invalid.
+
+Answer Format:
+Description: pick the knife on the table.
+start frame: 5
+end frame: 8
+(If invalid, simply return: invalid)
