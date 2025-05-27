@@ -1,0 +1,3 @@
+[submodule "egoscaler/data/third_party/llama3"]
+	path = egoscaler/data/third_party/llama3
+	url = https://github.com/meta-llama/llama3.git
