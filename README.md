@@ -60,7 +60,7 @@ We provide both training/evaluation code and pretrained checkpoints for reproduc
 ## Citation
 If you find our work useful in your research, please consider citing:
 ```bibtex
-@inproceedings{SpatialTracker,
+@inproceedings{egoscaler,
     title={Generating 6DoF Object Manipulation Trajectories from Action Description in Egocentric Vision},
     author={Tomoya, Yoshida and Shuhei, Kurita and Taichi, Nishimura and Shinsuke, Mori},
     booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
