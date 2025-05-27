@@ -69,3 +69,12 @@ pip install -e .
 cd ../Depth-Anything-V2
 pip install -e .
 ```
+
+## Training Dataset Construction
+1. Obtain Candidates
+```bash
+
+```
+
+
+## Evaluation Dataset Construction
