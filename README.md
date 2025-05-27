@@ -10,7 +10,7 @@
 ## News
 - [ ] Release codes and dataset. *(Code cleanup in progress)*
 - [x] `05.04.2025`: Selected as Highlight Paper!
-- [x] `27.02.2024`: Accepted at CVPR 2024!
+- [x] `27.02.2025`: Accepted at CVPR 2025!
 
 ## 🛠️ Installation
 
