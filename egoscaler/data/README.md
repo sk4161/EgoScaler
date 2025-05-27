@@ -1,27 +1,12 @@
-# EgoScaler: Generating 6DoF Object Manipulation Trajectories from Action Description in Egocentric Vision.
+## Dataset Overview
+The dataset consists of tuples including:
+- Action description
+- 6DoF object manipulation trajectory
+- RGB image
+- Depth map
+- Colored point cloud (if needed)
 
-1. Install dependencies
-```bash
-# spacy
-pip install spacy==3.7.6
-python -m spacy download en_core_web_trf
-
-# open3d
-conda install -c open3d-admin -c conda-forge open3d==0.18.0
-
-
-```
-
-2. Install third party
-```bash
-
-```
-
-### Dataset Overview
-
-The EgoTraj dataset consists of nearly 30K tuples of action descriptions, 6DoF object manipulation trajectories, depth maps, RGB images, and point clouds.
-
-We format our dataset following COCO format:
+Each sample is stored in a structure inspired by the COCO format:
 
 ```json
       {
@@ -44,18 +29,39 @@ We format our dataset following COCO format:
 ```
 
 To access each trajectory, depth map, RGB image, and point cloud:
-- image: ```f"/path/to/exoegotraj/obs_images/{images[i]['take_name']}/{images[i]['file_name']}.jpg"```
-- depth map: ```f"/path/to/exoegotraj/depths/{images[i]['take_name']}/{images[i]['file_name']}.npy"```
-- colored point cloud: ```f"/path/to/exoegotraj/pcrgbs/{images[i]['take_name']}/{images[i]['file_name']}.npy"```
-- trajectory: ```f"/path/to/exoegotraj/trajs/{images[i]['take_name']}/{images[i]['file_name']}.pickle"```
+- RGB Image: ```f"/path/to/datasetdir/EgoScaler/obs_images/{images[i]['take_name']}/{images[i]['file_name']}.jpg"```
+- Depth map: ```f"/path/to/datasetdir/EgoScaler/depths/{images[i]['take_name']}/{images[i]['file_name']}.npy"```
+- Colored point cloud: ```f"/path/to/datasetdir/EgoScaler/pcrgbs/{images[i]['take_name']}/{images[i]['file_name']}.npy"```
+- Trajectory: ```f"/path/to/datasetdir/EgoScaler/trajs/{images[i]['take_name']}/{images[i]['file_name']}.pickle"```
+
+## Preparation
+
+Currently, our framework supports only the Ego-Exo4D dataset.
+
+- **Ego-Exo4D**: Download [Ego-Exo4D dataset](https://ego-exo4d-data.org/) and follow the official instructions for access approval.
+- **Ego4D**: *(Coming soon)*
+- **EPIC-Kitchens**: *(Coming soon)*
+
+**NOTE**: To construct evaluation dataset by youself, you also need to download [HOT3D dataset](https://www.projectaria.com/datasets/hot3D/).
 
 
-3. Install third party library
+## Install dependencies for dataset construction
 ```bash
-# Install LLaMA3
+# spacy
+pip install spacy==3.7.6
+python -m spacy download en_core_web_trf
+
+# open3d
+conda install -c open3d-admin -c conda-forge open3d==0.18.0
+```
+
+2. Install third party
+```bash
+# Install llama3
 cd egoscaler/data/third_party
 
 git clone https://github.com/meta-llama/llama3.git
 cd llama3
 pip install -e .
+
 ```
