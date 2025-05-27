@@ -1,0 +1,8 @@
+*.pth
+*.pt
+*.egg-info/
+**/__pycache__/
+init.sh
+*.sh.o*
+*.sh.e*
+*.log
