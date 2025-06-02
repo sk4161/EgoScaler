@@ -83,5 +83,19 @@ bash scripts/1_get_cands.sh
 bash scripts/2_filter_cands.sh
 ```
 
+3. **Obtain Manipulated Object Name**: Obtain target object (manipulated object by camera wearer's hands) using LLaMA3-70B-Instruct.
+
+```bash
+bash scripts/3_get_object_name.sh 
+```
+
+4. **Pre-process images**: For faster processing of extracting trajectories, we pre-process videos to images in advance.
+
+```bash
+bash scripts/4_get_images.sh
+```
+
+
+
 
 ## Evaluation Dataset Construction
