@@ -1,3 +1,6 @@
 [submodule "egoscaler/data/third_party/llama3"]
 	path = egoscaler/data/third_party/llama3
 	url = https://github.com/meta-llama/llama3.git
+[submodule "egoscaler/models/pointllm/checkpoints/PointLLM_7B_v1.1_init"]
+	path = egoscaler/models/pointllm/checkpoints/PointLLM_7B_v1.1_init
+	url = https://huggingface.co/RunsenXu/PointLLM_7B_v1.1_init
