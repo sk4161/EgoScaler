@@ -24,7 +24,7 @@ def main(args):
     
     hod = HOD(args)
     
-    with open(f'{args.data_dir}', 'r') as f:
+    with open(f'{args.data_dir}/infos.json', 'r') as f:
         all_data = json.load(f)
     
     # for multi processing
@@ -144,8 +144,8 @@ if __name__ == "__main__":
                         required=False)
         
     # data dirs
-    parser.add_argument("--data_dir", default='/home/yoshida/EgoScaler/egoscaler/data/train/data/infos.json')
-    parser.add_argument("--save_dir", default='/data/g-liat/yoshida/EgoScaler')
+    parser.add_argument("--data_dir", default='./data')
+    parser.add_argument("--save_dir", default='/your/path/to/savedir/EgoScaler')
     parser.add_argument("--visualize", action='store_true')
     
     parser.add_argument('--start_index', type=int, default=0)

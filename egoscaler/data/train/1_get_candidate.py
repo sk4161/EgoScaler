@@ -32,11 +32,6 @@ def process_description(dataset_name, desc_info):
     return DATASET_MODULES[dataset_name].process_description(desc_info)
 
 def main(args):
-    # If formatting all, list all JSON candidates (currently unused)
-    if args.format_all:
-        all_cands_file = glob(f'{args.save_dir}/cands/*/*/*.json')
-        return
-
     candidates = []
 
     for dataset_name in USABLE_SCENARIO:
@@ -105,6 +100,5 @@ if __name__ == "__main__":
     parser.add_argument("--save_dir", default='/your/path/to/savedir/EgoScaler/')
     parser.add_argument("--dataset_name", type=str, default='egoexo4d',
                         choices=['egoexo4d', 'ego4d', 'epic_kitchens'])
-    parser.add_argument("--format_all", action="store_true")
     args = parser.parse_args()
     main(args)

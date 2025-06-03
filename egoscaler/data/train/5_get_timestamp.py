@@ -6,6 +6,7 @@ import base64
 import re
 import argparse
 from typing import List, Dict, Any
+from glob import glob
 
 import numpy as np
 from tqdm import tqdm
@@ -91,16 +92,36 @@ class AzureGpt4o:
         return base64_frames
 
 def main(args):
+    # If formatting all, list all JSON candidates (currently unused)
+    if args.format_all:
+        all_infos_file = glob(f"{args.data_dir}/infos/*/*/*.json")
+        all_data = []
+        for file_name in tqdm(all_infos_file):
+            with open(file_name, 'r') as f:
+                data = json.load(f)
+            if 'start_sec' in data:
+                continue
+            all_data.append(data)
+        os.makedirs(f"{args.data_dir}", exist_ok=True)
+        with open(f"{args.data_dir}/infos.json", 'w') as f:
+            json.dump(all_data, f)
 
     with open(args.prompt_path, 'r') as f:
         prompt = f.read()
     gpt4 = AzureGpt4o(prompt)
 
     font = ImageFont.truetype('./Menlo-Regular.ttf', 80)
+    
+    all_infos_file = glob(f"{args.data_dir}/infos/*/*/*.json")
+    all_data = []
+    for file_name in tqdm(all_infos_file):
+        with open(file_name, 'r') as f:
+            data = json.load(f)
+        if 'start_sec' in data:
+            continue
+        all_data.append(data)
 
-    with open(f'{args.data_dir}/infos.json', 'r') as f:
-        all_data = json.load(f)
-
+    print(f"Total data points: {len(all_data)}")
     print(f"{args.start_index} to {args.end_index}.")
     if args.start_index != 0 or args.end_index != -1:
         end_index = args.end_index if args.end_index != -1 else len(all_data)
@@ -113,11 +134,6 @@ def main(args):
         file_name = data['file_name']
 
         info_path = f'{args.save_dir}/infos/{dataset_name}/{video_uid}/{file_name}.json'
-        #if os.path.exists(info_path):
-        #    with open(info_path, 'r') as f:
-        #        existing_data = json.load(f)
-        #    if 'start_sec' in existing_data:
-        #        continue
 
         action_desc = data['action_description']
         manipulated_object = data['manipulated_object']
@@ -227,6 +243,8 @@ if __name__ == "__main__":
     
     parser.add_argument('--start_index', type=int, default=0)
     parser.add_argument('--end_index', type=int, default=-1)
+    
+    parser.add_argument('--format_all', action='store_true', help='Format all files in the data directory')
     args = parser.parse_args()
     
     main(args)

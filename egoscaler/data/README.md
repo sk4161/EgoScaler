@@ -70,6 +70,29 @@ cd ../Depth-Anything-V2
 pip install -e .
 ```
 
+3. (Option) Install hand-object-detector
+
+We used [hand_object_detector](https://github.com/ddshan/hand_object_detector) to improve detecting correct manipulated object.
+However, since this detector depends on old packages, we build another conda env for this.
+```bash
+(working under hand_object_detector directory)
+
+conda create --name handobj_new python=3.8
+conda activate handobj_new
+conda install pytorch==1.12.1 torchvision==0.13.1 torchaudio==0.12.1 cudatoolkit=11.3 -c pytorch
+
+# Compile the cuda dependencies 
+pip install -r requirements.txt
+cd lib
+python setup.py build develop
+```
+
+4. Download weights 
+- For SpaTracker: We use this [checkpoint](https://drive.google.com/drive/folders/1UtzUJLPhJdUg2XvemXXz1oe6KUQKVjsZ) and place it under ```SpaTracker/checkpoints```.
+- For Depth Anything: We use indoor metric depth [checkpotint](https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-Hypersim-Large/resolve/main/depth_anything_v2_metric_hypersim_vitl.pth?download=true) and place it under ```Depth-Anything-V2/checkpoints```.
+- For LLaMA3: Please follow officual instruction in [huggingface](https://huggingface.co/meta-llama).
+- (Option) For hand_object_detector: We use [egocentric version](https://drive.google.com/open?id=1H2tWsZkS7tDF8q1-jdjx6V9XrK25EDbE) and place it under ```hand_object_detector/models/res101_handobj_100K/pascal_voc```.
+
 ## Training Dataset Construction
 1. **Obtain Candidates**: Extracting candidates of dataset instances and format basic information in unified mannar.
 ```bash
@@ -95,7 +118,56 @@ bash scripts/3_get_object_name.sh
 bash scripts/4_get_images.sh
 ```
 
+5. **Conduct Temporal Action Localization**: Obtain action start/end timestamp using ChatGPT API.
 
+We used GPT-4o.
+
+```bash
+export AZURE_OPENAI_KEY=...
+export AZURE_OPENAI_ENDPOINT=...
+
+bash scripts/5_get_timestamps.sh
+
+# After processing all data
+python egoscaler/data/train/5_get_timestamp.py --format_all
+# -> generating infos.json under data dir
+```
+
+6. **Detect Humans / Hands**: To improve point cloud registration accuracy, we use human / hand bouding boxes to remove moving objects.
+
+```bash
+bash scripts/6_get_bouding_box.py
+```
+
+(Option) If you want to obtain better trajectories, I recommend you to conduct before moving to step 7.
+```bash
+python prepro_for_EgoScaler.py
+```
+
+7. **Extract 6DoF Object Trajectories**: Tracking active objects and extracting the 6DoF trajectories.
+
+```bash
+bash scripts/7_get_object_trajectory.sh
+```
 
 
 ## Evaluation Dataset Construction
+
+```bash
+cd egoscaler/data/eval
+```
+
+```bash
+# Pre-processing images 
+python 1_get_image.py 
+
+# target object is determined by total travel distance
+python 2_get_manipulated_object.py
+
+# obtain start/end timestamp and action description 
+python 3_get_desc_timestamp.py
+
+# extract object manipulation trajectory
+# by using recorded object poses
+python 4_get_object_trajecotry.py
+```

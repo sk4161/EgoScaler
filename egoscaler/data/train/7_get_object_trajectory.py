@@ -51,7 +51,7 @@ def main(args):
     # memory usage log
     log_memory_usage()
     
-    with open(f'{args.data_dir}', 'r') as f:
+    with open(f'{args.data_dir}/infos.json', 'r') as f:
         all_data = json.load(f)
     
     # for multi processing
@@ -68,14 +68,6 @@ def main(args):
         
         # Skip if trajectory already saved or metadata is invalid
         if os.path.exists(f'{args.save_dir}/trajs/{dataset_name}/{video_uid}/{file_name}.pkl'):
-            continue
-        
-        info_path = f'{args.save_dir}/infos/{dataset_name}/{video_uid}/{file_name}.json'
-        if not os.path.exists(info_path):
-            continue
-        with open(info_path, 'r') as f:
-            data_info = json.load(f)
-        if data_info.get('start_sec') is None:
             continue
         
         action_desc = data['action_description']
@@ -391,7 +383,7 @@ if __name__ == "__main__":
     parser.add_argument('--rgbd', action='store_true', help='whether to take the RGBD as input')
 
     # data dirs
-    parser.add_argument("--data_dir", default='./data/infos.json')
+    parser.add_argument("--data_dir", default='./data')
     parser.add_argument("--save_dir", default='/your/path/to/savedir/EgoScaler')
     parser.add_argument("--visualize", action='store_true')
     

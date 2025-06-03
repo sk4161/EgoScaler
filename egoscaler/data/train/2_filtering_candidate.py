@@ -7,6 +7,11 @@ from typing import List
 from glob import glob
 from tqdm import tqdm
 from llama import Dialog, Llama
+import torch.distributed as dist
+
+def init_distributed():
+    if not dist.is_initialized():
+        dist.init_process_group(backend="nccl") 
 
 class ChatCompletion:
     def __init__(self, args):
@@ -55,6 +60,8 @@ def chunkify(lst, chunk_size):
 
 
 def main(args):
+    init_distributed()
+    
     chatbot = ChatCompletion(args)
 
     rule_base = [
@@ -63,10 +70,15 @@ def main(args):
         "listen", "talk"
     ]
 
-    # Load data
-    all_cands_file = glob(f"{args.data_dir}/cands/*/*/*.json")  # raw candidates
-    all_fil_cands_file = glob(f"{args.data_dir}/fil_cands/*/*/*.json")  # already filtered candidates
+    # データの読み込み
 
+    all_cands_file = glob(f"{args.data_dir}/cands/*/*/*.json") # raw candidates
+    all_fil_cands_file = glob(f"{args.data_dir}/fil_cands/*/*/*.json") # already filtered candidates
+    
+    rank = dist.get_rank() if dist.is_initialized() else 0
+    world_size = dist.get_world_size() if dist.is_initialized() else 1
+    all_cands_file = all_cands_file[rank::world_size]
+    
     all_data = []
     for file_name in tqdm(all_cands_file):
         if file_name.replace('cands', 'fil_cands') in all_fil_cands_file:
@@ -78,24 +90,25 @@ def main(args):
     filtered_data = []
     batch_size = args.batch_size
     total = len(all_data)
-
+    
+    dist.barrier()
+    
     for batch in tqdm(chunkify(all_data, batch_size), desc="Processing data", total=(total + batch_size - 1) // batch_size):
         descriptions = [item['action_description'] for item in batch]
 
-        # Rule-based filtering
+        # ルールベースのフィルタリング
         rule_filtered_indices = [
             i for i, desc in enumerate(descriptions)
             if any(rule in desc for rule in rule_base)
         ]
-
-        # Remove entries that matched the rule-based filter
+        # データからルールにマッチしたものを除外
         for idx in sorted(rule_filtered_indices, reverse=True):
             del batch[idx]
 
         if not batch:
             continue
 
-        # LLM-based filtering
+        # LLMベースのフィルタリング
         outputs = chatbot.completions([item['action_description'] for item in batch])
 
         for data, output in zip(batch, outputs):
@@ -110,9 +123,9 @@ def main(args):
                 os.makedirs(os.path.dirname(file_name), exist_ok=True)
                 with open(file_name, 'w') as f:
                     json.dump(data, f)
-
+                
                 filtered_data.append(data)
-
+                
     print(f"Total candidates: {len(filtered_data)}")
 
 if __name__ == "__main__":

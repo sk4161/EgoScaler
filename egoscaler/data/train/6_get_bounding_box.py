@@ -105,7 +105,7 @@ def main(args):
     model = model.to(device)
     
     # data setting
-    with open(args.data_dir, 'r') as f:
+    with open(f"{args.data_dir}/infos.json", 'r') as f:
         all_data = json.load(f)
 
     already = set()
@@ -186,7 +186,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # data dirs
-    parser.add_argument("--data_dir", default='./data/infos.json')
+    parser.add_argument("--data_dir", default='./data')
     parser.add_argument("--save_dir", default='/your/path/to/savedir/EgoScaler')
 
     parser.add_argument("--batch_size", type=int, default=4)
