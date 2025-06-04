@@ -66,7 +66,8 @@ Output trajectory with point cloud as video.
 python vis/video.py
 ```
 Here's the expected output.
-![](assets/visualization_video.gif)
+
+<img src="assets/visualization_video.gif" width="300">
 
 2. Generate object trajecotries.
 
