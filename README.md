@@ -57,6 +57,22 @@ We provide both training/evaluation code and pretrained checkpoints for reproduc
 - 🧠 **Code:** Please follow the guide in [`egoscaler/models/README.md`](./egoscaler/models/README.md).
 - 📍 **Checkpoints:** *(Coming soon.)*
 
+## Demo
+1. Visualize extracted trajectories.
+
+Output trajectory with point cloud as video.
+
+```bash
+python vis/video.py
+```
+2. Generate object trajecotries.
+
+Draw trajectory and point cloud using Open3D.
+
+```bash
+python vis/interactive.py
+```
+
 ## Citation
 If you find our work useful in your research, please consider citing:
 ```bibtex
