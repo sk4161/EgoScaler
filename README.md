@@ -65,6 +65,9 @@ Output trajectory with point cloud as video.
 ```bash
 python vis/video.py
 ```
+Here's the expected output.
+![](assets/visualization_video.gif)
+
 2. Generate object trajecotries.
 
 Draw trajectory and point cloud using Open3D.
