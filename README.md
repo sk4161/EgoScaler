@@ -5,7 +5,7 @@
 > [**Gnerating 6DoF Object Manipulation Trajecotries from Action Description in Egocentric Vision**](https://biscue5.github.io/egoscaler-project-page/),  
 > Tomoya Yoshida\*, Shuhei Kurita, Taichi Nishimura, Shinsuke Mori, 
 > CVPR 2025,
-> *Paper at [arxiv]()*  
+> *Paper at [arxiv](https://arxiv.org/abs/2506.03605)*  
 
 ## News
 - [ ] Release codes and dataset. *(Code cleanup in progress)*
