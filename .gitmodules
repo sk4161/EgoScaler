@@ -4,3 +4,6 @@
 [submodule "egoscaler/models/pointllm/checkpoints/PointLLM_7B_v1.1_init"]
 	path = egoscaler/models/pointllm/checkpoints/PointLLM_7B_v1.1_init
 	url = https://huggingface.co/RunsenXu/PointLLM_7B_v1.1_init
+[submodule "egoscaler/data/third_party/CUT3R"]
+	path = egoscaler/data/third_party/CUT3R
+	url = https://github.com/sk4161/CUT3R.git
