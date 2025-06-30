@@ -7,3 +7,6 @@
 [submodule "egoscaler/data/third_party/CUT3R"]
 	path = egoscaler/data/third_party/CUT3R
 	url = https://github.com/sk4161/CUT3R.git
+[submodule "egoscaler/data/third_party/Grounded-SAM-2"]
+	path = egoscaler/data/third_party/Grounded-SAM-2
+	url = https://github.com/sk4161/Grounded-SAM-2.git
