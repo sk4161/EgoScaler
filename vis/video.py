@@ -177,7 +177,7 @@ def main():
         vis.poll_events()
         vis.update_renderer()
 
-        image = np.asarray(vis.capture_screen_float_buffer(do_render=False))
+        image = np.asarray(vis.capture_screen_float_buffer(do_render=True))
         image = (image * 255).astype(np.uint8)
         pil_image = Image.fromarray(image)
         pil_image.save(f'./cache_imgs/{i}.jpg')
