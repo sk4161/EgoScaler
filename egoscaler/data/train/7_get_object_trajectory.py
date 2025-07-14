@@ -61,7 +61,10 @@ def main(args):
         all_data = all_data[args.start_index:args.end_index if args.end_index != -1 else None]
         
     for idx, data in enumerate(tqdm(all_data, desc="Processing Data")):
-        dataset_name = data['dataset_name']
+        if "dataset_name" in data:
+            dataset_name = data["dataset_name"]
+        else:
+            dataset_name = "hot3d"
         video_uid = data['video_uid']
         take_name = data.get('take_name', '')
         file_name = data.get('file_name', '')  
@@ -89,7 +92,10 @@ def main(args):
         principal_point = camera_cfg.devices.aria.principal_point
     
         # obs info
-        pil_image = Image.open(f'{args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}/{start_sec}.jpg')
+        start_sec_base = str(start_sec).replace(".", "")
+        pil_image = Image.open(
+            f"{args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}/{start_sec_base}.jpg"
+        )
         image = np.array(pil_image)
         width, height = pil_image.size
         obs_depth, obs_points, obs_colors = depth_anything.get_depth(
