@@ -49,7 +49,10 @@ class LazyDataset(Dataset):
     
     def __getitem__(self, item):
         data = self.dataset[item]
-        dataset_name = data['dataset_name']
+        if data["dataset_name"]:
+            dataset_name = data["dataset_name"]
+        else:
+            dataset_name = "hot3d"
         video_uid = data['video_uid']
         file_name = data['file_name']
         manipulated_object = data['manipulated_object']
@@ -77,10 +80,36 @@ class LazyDataset(Dataset):
         images = []
         sizes = []
         queries = []
-        for _t in duration:
+        image_dir = (
+            f"{self.args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}"
+        )
+        all_image_paths = sorted(glob.glob(f"{image_dir}/*.jpg"))
+
+        duration_from_files = []
+        images_to_process = []
+
+        for img_path in all_image_paths:
             try:
-                pil_image = Image.open(f'{args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}/{_t}.jpg')
-                image = np.array(pil_image)
+                timestamp_int_str = os.path.basename(img_path).split(".")[0]
+                timestamp_sec = (
+                    float(timestamp_int_str) / 1e9
+                )
+
+                if start_sec <= timestamp_sec <= end_sec:
+                    images_to_process.append(img_path)
+                    duration_from_files.append(round(timestamp_sec, 3))
+            except (ValueError, IndexError):
+                print(f"Error processing file: {img_path}. Skipping.")
+                continue
+
+        if not images_to_process:
+            print(f"No valid images found for: {dataset_name}, {video_uid}, {file_name}.")
+
+            return [], [], [], [], dataset_name, video_uid, file_name
+
+        for img_path in images_to_process:
+            try:
+                pil_image = Image.open(img_path)
             except:
                 print(f"Error opening file: {dataset_name}, {video_uid}, {file_name}.")
                 sys.exit(1)  # スクリプトを終了
@@ -89,7 +118,9 @@ class LazyDataset(Dataset):
             text = '. '.join(['person', 'hand', manipulated_object])   
             text += '.' 
             queries.append(text)
-        
+
+        duration = np.array(duration_from_files)
+
         return images, sizes, queries, duration, dataset_name, video_uid, file_name
 
 @torch.no_grad()
@@ -119,7 +150,10 @@ def main(args):
     bboxes_path = os.path.join(args.save_dir, "bboxes")
     filtered_data = []
     for data in tqdm(all_data, desc="Removing..."):
-        dataset_name = data['dataset_name']
+        if data["dataset_name"]:
+            dataset_name = data["dataset_name"]
+        else:
+            dataset_name = "hot3d"
         video_uid = data['video_uid']
         file_name = data['file_name']
         info_file = os.path.join(infos_path, dataset_name, video_uid, f"{file_name}.json")
