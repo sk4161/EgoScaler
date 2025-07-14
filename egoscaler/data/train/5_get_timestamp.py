@@ -13,9 +13,11 @@ from tqdm import tqdm
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 from moviepy.editor import ImageSequenceClip
-from openai import AzureOpenAI
+from openai import OpenAI
 from egoscaler.configs import CameraConfig as camera_cfg
+import dotenv
 
+dotenv.load_dotenv(dotenv_path=".env")
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 def price_gpt4o_usd(response):
@@ -28,11 +30,7 @@ def price_gpt4o_usd(response):
 class AzureGpt4o:
     def __init__(self, prompt: str):
         self.prompt = prompt
-        self.client = AzureOpenAI(
-            api_key=os.getenv("AZURE_OPENAI_KEY"),
-            api_version="",
-            azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def __call__(self, query: str, active_object: str, pil_frames: List[Image.Image]) -> Dict[str, Any]:
         call_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -110,8 +108,10 @@ def main(args):
         prompt = f.read()
     gpt4 = AzureGpt4o(prompt)
 
-    font = ImageFont.truetype('./Menlo-Regular.ttf', 80)
-    
+    font = ImageFont.truetype(
+        "/home/kanazawa/egovision/EgoScaler/Menlo-Regular.ttf", 80
+    )
+
     all_infos_file = glob(f"{args.data_dir}/infos/*/*/*.json")
     all_data = []
     for file_name in tqdm(all_infos_file):
@@ -127,9 +127,12 @@ def main(args):
         end_index = args.end_index if args.end_index != -1 else len(all_data)
         all_data = all_data[args.start_index:end_index]
 
-    total_price_usd = 0.0  
+    total_price_usd = 0.0
     for data in tqdm(all_data):
-        dataset_name = data['dataset_name']
+        if "dataset_name" in data:
+            dataset_name = data["dataset_name"]
+        else:
+            dataset_name = "hot3d"
         video_uid = data['video_uid']
         file_name = data['file_name']
 
