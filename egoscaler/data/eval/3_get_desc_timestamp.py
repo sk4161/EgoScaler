@@ -15,12 +15,16 @@ import datetime
 import base64
 from io import BytesIO
 from PIL import Image
-from openai import AzureOpenAI
+from openai import OpenAI
 import json
 import argparse
 import re
 from PIL import Image, ImageDraw, ImageFont
 from egoscaler.configs import CameraConfig as camera_cfg
+import dotenv
+
+dotenv.load_dotenv(dotenv_path=".env")
+
 
 def price_gpt4o_usd(response):
     price_input_per_1k = 5./1000
@@ -33,11 +37,7 @@ class AzureGpt4o(object):
     def __init__(self, prompt):
         
         self.prompt = prompt
-        self.client = AzureOpenAI(
-            api_key = os.getenv("AZURE_OPENAI_KEY"),  
-            api_version = "2023-05-15",
-            azure_endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        )
+        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def __call__(self, pil_frames, manipulated_object_name):
         call_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
