@@ -49,7 +49,7 @@ class LazyDataset(Dataset):
     
     def __getitem__(self, item):
         data = self.dataset[item]
-        if data["dataset_name"]:
+        if "dataset_name" in data:
             dataset_name = data["dataset_name"]
         else:
             dataset_name = "hot3d"
@@ -150,7 +150,7 @@ def main(args):
     bboxes_path = os.path.join(args.save_dir, "bboxes")
     filtered_data = []
     for data in tqdm(all_data, desc="Removing..."):
-        if data["dataset_name"]:
+        if "dataset_name" in data:
             dataset_name = data["dataset_name"]
         else:
             dataset_name = "hot3d"
