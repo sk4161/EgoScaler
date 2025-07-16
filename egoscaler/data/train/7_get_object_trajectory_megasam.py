@@ -17,10 +17,6 @@ import open3d as o3d
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as R
 
-from spatracker.predictor import SpaTrackerPredictor
-from spatracker.utils.visualizer import Visualizer
-from depth import DepthAnything
-from egoscaler.data.train.tools.grounded_sam import GroundedSAM
 from egoscaler.configs import CameraConfig as camera_cfg, DataConfig as data_cfg
 from egoscaler.data.tools import (
     iou,
@@ -33,30 +29,7 @@ from egoscaler.data.tools import (
 )
 
 
-def log_memory_usage():
-    process = psutil.Process(os.getpid())
-    mem = process.memory_info().rss / (1024**2)  # memory usage in MB
-    print(f"Memory Usage: {mem:.2f} MB")
-
-
 def main(args):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # load models
-    depth_anything = DepthAnything(args, device)
-    gsam_model = GroundedSAM(
-        detector_id="IDEA-Research/grounding-dino-base",
-        segmenter_id="facebook/sam-vit-huge",
-        device=device,
-    )
-    spatrack = SpaTrackerPredictor(
-        checkpoint=args.checkpoint, interp_shape=(384, 512), seq_length=12
-    )
-    spatrack.to(device)
-
-    # memory usage log
-    log_memory_usage()
-
     with open(f"{args.data_dir}/infos.json", "r") as f:
         all_data = json.load(f)
 
@@ -74,17 +47,9 @@ def main(args):
         else:
             dataset_name = "hot3d"
         video_uid = data["video_uid"]
-        take_name = data.get("take_name", "")
         file_name = data.get("file_name", "")
 
-        # Skip if trajectory already saved or metadata is invalid
-        if os.path.exists(
-            f"{args.save_dir}/trajs/{dataset_name}/{video_uid}/{file_name}.pkl"
-        ):
-            continue
-
         action_desc = data["action_description"]
-        manipulated_object = data["manipulated_object"]
 
         sampling_rate = 1 / camera_cfg.fps
         timestamp = data["timestamp"]
@@ -97,265 +62,208 @@ def main(args):
                 timestamp + camera_cfg.time_window,
                 sampling_rate,
             ),
-            3,
+            9,
         )
-        start_index = np.where(original_duration == round(start_sec, 3))[0]
-        end_index = np.where(original_duration == round(end_sec, 3))[0]
-        duration = original_duration[start_index[0] : end_index[0] + 1]
+        npz_file_path = args.npz_file_path
+        data = np.load(npz_file_path)
+        npz_file_path_pc = args.pc_npz_file_path
+        pc_data = np.load(npz_file_path_pc)
+        depth = data["depths"]  # (N, H, W)
+        images = data["images"]  # (N, H, W, 3)
+        intrinsic = data["intrinsic"]  # (3, 3)
+        cam_c2w = data["cam_c2w"]  # (N, 4, 4)
+
+        point_maps = pc_data["point_maps"]  # (N, H, W, 3)
+        color_maps = pc_data["color_maps"]  # (N, H, W, 3)
+
+        width, height = images.shape[2], images.shape[1]
+
+        print(f"Start sec: {start_sec}, End sec: {end_sec}")
+        start_index = np.where(np.round(original_duration, 3) == round(start_sec, 3))[0]
+        end_index = np.where(np.round(original_duration, 3) == round(end_sec, 3))[0]
+        print(f"Start index: {start_index}, End index: {end_index}")
 
         # camera intrinsics
-        focal_len_x = camera_cfg.devices.aria.focal_len
-        focal_len_y = camera_cfg.devices.aria.focal_len
-        principal_point = camera_cfg.devices.aria.principal_point
+        focal_len_x = intrinsic[0, 0]
+        focal_len_y = intrinsic[1, 1]
+        principal_point_x = intrinsic[0, 2]
+        principal_point_y = intrinsic[1, 2]
 
         # obs info
-        start_sec_base = str(start_sec).replace(".", "")
-        pil_image = Image.open(
-            f"{args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}/{start_sec_base}.jpg"
+        pil_image_dir = f"{args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}"
+        if not os.path.exists(pil_image_dir):
+            print(f"Image directory {pil_image_dir} does not exist. Skipping.")
+            continue
+
+        image_files = sorted(
+            [
+                f
+                for f in os.listdir(pil_image_dir)
+                if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            ],
+            key=lambda x: int(os.path.splitext(x)[0]),
         )
+        if not image_files:
+            print(f"No images found in {pil_image_dir}. Skipping.")
+            continue
+
+        pil_image_path = os.path.join(pil_image_dir, image_files[start_index[0]])
+        if not os.path.exists(pil_image_path):
+            print(f"Image file {pil_image_path} does not exist. Skipping.")
+            continue
+
+        pil_image = Image.open(pil_image_path).convert("RGB")
+        # resize to images size
+        pil_image = pil_image.resize((width, height))
         image = np.array(pil_image)
-        width, height = pil_image.size
-        obs_depth, obs_points, obs_colors = depth_anything.get_depth(
-            pil_image=pil_image,
-            final_width=width,
-            final_height=height,
-            focal_len_x=focal_len_x,
-            focal_len_y=focal_len_y,
-            principal_point=principal_point,
-        )
 
-        # get tracking results
-        ############################################################################################################
-        clip = []
-        depths = []
-        for i, _t in enumerate(duration):
-            pil_img = Image.open(
-                f"{args.save_dir}/images/{dataset_name}/{video_uid}/{file_name}/{_t}.jpg"
+        object_points_sequence = []
+        object_colors_sequence = []
+        for frame_idx in range(start_index[0], end_index[0] + 1):
+            object_pc_path = f"{args.monst3r_output_dir}/object_pointclouds/frame_{frame_idx:05d}.npy"
+            object_color_path = (
+                f"{args.monst3r_output_dir}/object_colors/frame_{frame_idx:05d}.npy"
             )
-            width, height = pil_img.size
-            img = np.array(pil_img)
-            clip.append(img)
-            depth = depth_anything.get_only_depth(
-                pil_image=pil_img, final_width=width, final_height=height
-            )
-            depths.append(depth)
 
-        if not len(clip):
-            continue
+            if not os.path.exists(object_pc_path) or not os.path.exists(
+                object_color_path
+            ):
+                print(
+                    f"Object point cloud files for index {frame_idx} do not exist. Skipping."
+                )
+                continue
 
-        # get target object mask
-        object_masks, _, object_scores = gsam_model.predict(
-            pil_image, [manipulated_object], threshold=data_cfg.mani_obj_det_threshold
-        )
-        if object_scores is None:  # target object not found
-            continue
+            object_points = np.load(object_pc_path)
+            object_colors = np.load(object_color_path)
 
-        # NOTE: hods filtering; not sure how much this is effective
-        if os.path.exists(
-            f"{args.save_dir}/hods/{dataset_name}/{video_uid}/{file_name}.pkl"
-        ):
-            with open(
-                f"{args.save_dir}/hods/{dataset_name}/{video_uid}/{file_name}.pkl", "rb"
-            ) as f:
-                hod_results = pickle.load(f)
-            hod_res = hod_results[start_sec]
-        else:
-            continue
+            if object_points.shape[0] == 0:
+                print(f"No points found in {object_pc_path}. Skipping.")
+                continue
 
-        if len(hod_res["obj-bbox"]):
-            hod_obj_mask = np.zeros_like(object_masks[0])
-            hod_obj_mask[
-                hod_res["obj-bbox"][0][1] : hod_res["obj-bbox"][0][3],
-                hod_res["obj-bbox"][0][0] : hod_res["obj-bbox"][0][2],
-            ] = 1
-            ious = [iou(hod_obj_mask, obj_mask) for obj_mask in object_masks]
-            target_obj_mask = object_masks[np.argmax(ious)]
-        else:
-            target_obj_mask = object_masks[
-                np.argmax(object_scores)
-            ]  # most confident object
+            object_points_sequence.append(object_points)
+            object_colors_sequence.append(object_colors)
 
-        # tracking
-        clip = np.stack(clip)
-        depths = np.stack(depths)
-        rgbd_seq = np.concatenate([clip, depths[:, :, :, np.newaxis]], axis=-1)
-
-        clip = torch.from_numpy(clip).permute(0, 3, 1, 2)[None].float()
-        clip = clip.to(device)
-        depths = torch.from_numpy(depths).float().to(device)[:, None]
-
-        pred_tracks, pred_visibility, T_Firsts = spatrack(
-            clip,
-            video_depth=depths,
-            grid_size=args.grid_size,
-            segm_mask=torch.from_numpy(target_obj_mask)[None, None],
-            wind_length=12,
-        )
-        msk_query = T_Firsts == args.query_frame
-        pred_tracks = pred_tracks[:, :, msk_query.squeeze()]
-        pred_visibility = pred_visibility[:, :, msk_query.squeeze()]
-        pred_tracks = pred_tracks.cpu().detach()
-
-        if args.visualize:
-            vis = Visualizer(
-                save_dir="./viz_data",
-                pad_value=0,
-                linewidth=3,
-                show_first_frame=0,
-                tracks_leave_trace=10,
-                fps=10,
-            )
-            vis.visualize(
-                clip,
-                pred_tracks[..., :2],
-                pred_visibility,
-                query_frame=args.query_frame,
-            )
         ############################################################################################################
 
         # trajectory projection
         ############################################################################################################
-        if os.path.exists(
-            f"{args.save_dir}/bboxes/{dataset_name}/{video_uid}/{file_name}.json"
-        ):
-            with open(
-                f"{args.save_dir}/bboxes/{dataset_name}/{video_uid}/{file_name}.json",
-                "r",
-            ) as f:
-                bboxes = json.load(f)
-        else:
-            continue
+        start = time.time()
+        voxel_size = data_cfg.pcm_cfg.voxel_size * 0.1  # 0.01
 
-        d_thres = data_cfg.depth_threshold
-        pred_tracks = pred_tracks.squeeze(0).numpy()
-        depths = depths.squeeze(1).detach().cpu().numpy()
-        points, colors = get_points_colors(
-            rgbd=rgbd_seq[0],
-            bbox=bboxes[str(start_sec)],
-            width=width,
-            height=height,
-            principal_p=principal_point,
-            focal_len_x=focal_len_x,
-            focal_len_y=focal_len_y,
-            d_thres=d_thres,
-        )
         target = o3d.geometry.PointCloud()
-        target.points = o3d.utility.Vector3dVector(points)
-        target.colors = o3d.utility.Vector3dVector(colors)
+        target.points = o3d.utility.Vector3dVector(object_points_sequence[0])
+        target.colors = o3d.utility.Vector3dVector(object_colors_sequence[0])
+        search_radius = voxel_size * 3.0
+        target.estimate_normals(
+            search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                radius=search_radius, max_nn=30
+            )
+        )
 
-        # TODO pred_track filtering
-        xs = np.round(pred_tracks[:, :, 0]).astype(int)
-        ys = np.round(pred_tracks[:, :, 1]).astype(int)
-        validness = (
-            (0 <= xs) & (xs < width) & (0 <= ys) & (ys < height)
-        )  # check out of frame exists
-        valid_frames = (
-            np.sum(validness, axis=1) >= np.sum(validness[0]) / 2
-        )  # if some of frames our of range beyound thresh, skip the instance
-
-        if not np.all(valid_frames):
-            continue
-
-        valid_indices = np.all(validness, axis=0)
-
-        transform_matrices = {}
+        transform_matrices = []
+        transform_matrices.append(np.identity(4))
         projected_traj = []
         regist_flag = True
-        start = time.time()
-        for i, (_t, coords, depth, rgbd) in enumerate(
-            zip(duration, pred_tracks, depths, rgbd_seq)
-        ):
-            xs, ys, zs = (
-                np.round(coords[:, 0]).astype(int),
-                np.round(coords[:, 1]).astype(int),
-                coords[:, 2],
+
+        absolute_rotation = np.eye(3)
+        absolute_position = object_points_sequence[0].mean(axis=0)
+        init_bbox = minimum_3Dbox(object_points_sequence[0])
+
+        if init_bbox is None:  # Failed to create 3D bbox
+            regist_flag = False
+            break
+
+        quaternion = R.from_matrix(absolute_rotation).as_quat()
+        projected_traj.append(np.concatenate([absolute_position, quaternion]))
+
+        for i in range(1, len(object_points_sequence)):
+            current_object_point = object_points_sequence[i]
+            current_object_color = object_colors_sequence[i]
+
+            source = o3d.geometry.PointCloud()
+            source.points = o3d.utility.Vector3dVector(current_object_point)
+            source.colors = o3d.utility.Vector3dVector(current_object_color)
+            source.estimate_normals(
+                search_param=o3d.geometry.KDTreeSearchParamHybrid(
+                    radius=search_radius, max_nn=30
+                )
             )
-            xs, ys, zs = xs[valid_indices], ys[valid_indices], zs[valid_indices]
 
-            ratio_depth = np.mean(depth[ys, xs] / zs)
+            source_keypoints_current, source_feature_current = prepare_dataset(
+                source, voxel_size
+            )
+            target_keypoints, target_feature = prepare_dataset(target, voxel_size)
 
-            xs = (xs - principal_point) / focal_len_x
-            ys = (ys - principal_point) / focal_len_y
-            xs *= zs
-            ys *= zs
-            object_coords = np.array([xs, ys, zs]).T
+            # --- DEBUG LOGGING ---
+            print(
+                f"Frame {i}: Source Keypoints: {source_keypoints_current.points.__len__()}"
+            )
+            print(f"Frame {i}: Target Keypoints: {target_keypoints.points.__len__()}")
+            if source_feature_current is not None:
+                print(
+                    f"Frame {i}: Source Feature data shape: {source_feature_current.data.shape}"
+                )
+            # --- END DEBUG LOGGING ---
 
-            if i == 0:
-                absolute_rotation = np.eye(3)
-                absolute_position = object_coords.mean(axis=0)
-                init_bbox = minimum_3Dbox(np.array([xs, ys, zs]).T)
-                init_coords = object_coords.copy()
-                init_rotation = absolute_rotation.copy()
+            # global_matching
+            result_ransac = execute_global_registration(
+                source_keypoints_current,
+                target_keypoints,
+                source_feature_current,
+                target_feature,
+                voxel_size,
+            )
 
-                if init_bbox is None:  # Failed to create 3D bbox
-                    regist_flag = False
-                    break
-
+            # --- DEBUG LOGGING ---
+            if result_ransac is not None:
+                print(
+                    f"Frame {i}: RANSAC Registration Fitness: {result_ransac.fitness:.4f}, Inlier RMSE: {result_ransac.inlier_rmse:.4f}"
+                )
             else:
-                points, colors = get_points_colors(
-                    rgbd=rgbd,
-                    bbox=bboxes[str(_t)],
-                    width=width,
-                    height=height,
-                    principal_p=principal_point,
-                    focal_len_x=focal_len_x,
-                    focal_len_y=focal_len_y,
-                    d_thres=d_thres,
-                )
-                source = o3d.geometry.PointCloud()
-                source.points = o3d.utility.Vector3dVector(points)
-                source.colors = o3d.utility.Vector3dVector(colors)
+                print(f"Frame {i}: RANSAC Registration failed or returned None.")
+            # --- END DEBUG LOGGING ---
 
-                if not _t in transform_matrices:
-                    voxel_size = data_cfg.pcm_cfg.voxel_size  # 0.1
-                    source_keypoints, source_feature = prepare_dataset(
-                        source, voxel_size
-                    )
-                    target_keypoints, target_feature = prepare_dataset(
-                        target, voxel_size
-                    )
-                    # global_matching
-                    result_ransac = execute_global_registration(
-                        source_keypoints,
-                        target_keypoints,
-                        source_feature,
-                        target_feature,
-                        voxel_size,
-                    )
-                    # local matching
-                    result_icp = refine_registration(
-                        source_keypoints, target_keypoints, result_ransac, voxel_size
-                    )
+            # --- DEBUG LOGGING ---
+            print(
+                f"Frame {i}: Source Point Cloud Size: {len(source.points)}, Target Point Cloud Size: {len(target.points)}"
+            )
+            # --- END DEBUG LOGGING ---
 
-                    if result_icp is None:  # Point cloud registration failed.
-                        regist_flag = False
-                        break
-                    else:
-                        transform_matrices[_t] = result_icp.transformation
+            # # local matching
+            # result_icp = refine_registration(
+            #     source,
+            #     target,
+            #     result_ransac,
+            #     voxel_size,
+            # )
 
-                target = source
+            # # --- DEBUG LOGGING ---
+            # if result_icp is not None:
+            #     print(
+            #         f"Frame {i}: ICP Registration Fitness: {result_icp.fitness:.4f}, Inlier RMSE: {result_icp.inlier_rmse:.4f}"
+            #     )
+            # else:
+            #     print(f"Frame {i}: ICP Registration failed or returned None.")
+            # # --- END DEBUG LOGGING ---
 
-                # projection to initial frame
-                transform = np.identity(4)
-                for _ in sorted(transform_matrices):
-                    if _ > _t:
-                        break
-                    transform = np.dot(transform, transform_matrices[_])
+            if result_ransac is None:  # Point cloud registration failed.
+                regist_flag = False
+                break
+            else:
+                transform_matrices.append(result_ransac.transformation)
 
-                homogeneous_coords = np.concatenate(
-                    [object_coords, np.ones((object_coords.shape[0], 1))], axis=-1
-                )
-                projected_coords_homogeneous = (transform @ homogeneous_coords.T).T
-                projected_coords = (
-                    projected_coords_homogeneous[:, :3]
-                    / projected_coords_homogeneous[:, 3][:, np.newaxis]
-                )
+            target = source
 
-                R_mat = compute_rotation(init_coords, projected_coords[:, :3])
-                absolute_rotation = R_mat @ init_rotation
-                absolute_position = projected_coords.mean(axis=0)[:3]
+            # projection to initial frame
+            transform = transform_matrices[0]
+            for j in range(1, i + 1):
+                transform = np.dot(transform, transform_matrices[j])
 
-            absolute_position *= ratio_depth
+            absolute_rotation = transform[:3, :3]
+            local_center = current_object_point.mean(axis=0)
+            homog = np.concatenate([local_center, [1]])
+            absolute_position = (transform @ homog)[:3]
+
             quaternion = R.from_matrix(absolute_rotation).as_quat()
             projected_traj.append(np.concatenate([absolute_position, quaternion]))
         ############################################################################################################
@@ -366,6 +274,29 @@ def main(args):
             continue
 
         traj_quat = np.stack(projected_traj)
+
+        # project to first frame
+        T_c2w_first = cam_c2w[start_index[0]]
+        R_c2w_first = T_c2w_first[:3, :3]
+        t_c2w_first = T_c2w_first[:3, 3]
+
+        R_w2c_first = R_c2w_first.T
+        t_w2c_first = -R_w2c_first @ t_c2w_first
+
+        positions_world = traj_quat[:, 0:3]
+        quats_world = traj_quat[:, 3:7]
+
+        positions_aligned = (
+            R_w2c_first @ positions_world.T + t_w2c_first[:, np.newaxis]
+        ).T
+
+        R_world_to_cam_obj = R.from_matrix(R_w2c_first)
+        rotations_world_obj = R.from_quat(quats_world)
+
+        rotations_aligned_obj = R_world_to_cam_obj * rotations_world_obj
+        quats_aligned = rotations_aligned_obj.as_quat()
+
+        traj_quat = np.hstack([positions_aligned, quats_aligned])
 
         positions = traj_quat[:, 0:3]
         quat = traj_quat[:, 3:7]
@@ -386,17 +317,17 @@ def main(args):
 
         if args.visualize:
             pil_image.save("./viz_data/image.jpg")
-            np.save("./viz_data/depth", obs_depth)
+            # np.save("./viz_data/depth", obs_depth)
             with open("./viz_data/trajectory.pkl", "wb") as f:
                 pickle.dump(traj, f)
             with open("./viz_data/text.txt", "w") as f:
                 f.write(action_desc)
 
             traj_rotvec[:, 0] = (
-                focal_len_x * traj_rotvec[:, 0] / traj_rotvec[:, 2] + principal_point
+                focal_len_x * traj_rotvec[:, 0] / traj_rotvec[:, 2] + principal_point_x
             )
             traj_rotvec[:, 1] = (
-                focal_len_y * traj_rotvec[:, 1] / traj_rotvec[:, 2] + principal_point
+                focal_len_y * traj_rotvec[:, 1] / traj_rotvec[:, 2] + principal_point_y
             )
 
             plt.imshow(image)
@@ -408,31 +339,30 @@ def main(args):
             pdb.set_trace()
         else:
             os.makedirs(
-                f"{args.save_dir}/obs_images/{dataset_name}/{video_uid}", exist_ok=True
+                f"{args.save_dir}/megasam/obs_images/{dataset_name}/{video_uid}",
+                exist_ok=True,
             )
             os.makedirs(
-                f"{args.save_dir}/depths/{dataset_name}/{video_uid}", exist_ok=True
+                f"{args.save_dir}/megasam/depths/{dataset_name}/{video_uid}",
+                exist_ok=True,
             )
             os.makedirs(
-                f"{args.save_dir}/trajs/{dataset_name}/{video_uid}", exist_ok=True
+                f"{args.save_dir}/megasam/trajs/{dataset_name}/{video_uid}",
+                exist_ok=True,
             )
 
             pil_image.save(
-                f"{args.save_dir}/obs_images/{dataset_name}/{video_uid}/{file_name}.jpg"
+                f"{args.save_dir}/megasam/obs_images/{dataset_name}/{video_uid}/{file_name}.jpg"
             )
-            np.save(
-                f"{args.save_dir}/depths/{dataset_name}/{video_uid}/{file_name}",
-                obs_depth,
-            )
+            # np.save(
+            #     f"{args.save_dir}/megasam/depths/{dataset_name}/{video_uid}/{file_name}",
+            #     obs_depth,
+            # )
             with open(
-                f"{args.save_dir}/trajs/{dataset_name}/{video_uid}/{file_name}.pkl",
+                f"{args.save_dir}/megasam/trajs/{dataset_name}/{video_uid}/{file_name}.pkl",
                 "wb",
             ) as f:
                 pickle.dump(traj, f)
-
-        # log memory usage
-        if idx % 10 == 0:
-            log_memory_usage()
 
         # release memory
         gc.collect()
@@ -487,6 +417,17 @@ if __name__ == "__main__":
 
     parser.add_argument("--start_index", type=int, default=0)
     parser.add_argument("--end_index", type=int, default=-1)
+
+    # intermediate results
+    parser.add_argument("--monst3r_output_dir", default="./demo_tmp")
+    parser.add_argument(
+        "--npz_file_path",
+        default="/home/kanazawa/egovision/EgoScaler/egoscaler/data/third_party/mega-sam/outputs_cvd/hoge_sgd_cvd_hr.npz",
+    )
+    parser.add_argument(
+        "--pc_npz_file_path",
+        default="/home/kanazawa/egovision/EgoScaler/output_maps.npz",
+    )
 
     args = parser.parse_args()
 
