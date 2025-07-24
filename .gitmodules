@@ -13,3 +13,6 @@
 [submodule "egoscaler/data/third_party/mega-sam"]
 	path = egoscaler/data/third_party/mega-sam
 	url = https://github.com/mega-sam/mega-sam.git
+[submodule "egoscaler/data/third_party/SpaTrackerV2"]
+	path = egoscaler/data/third_party/SpaTrackerV2
+	url = https://github.com/sk4161/SpaTrackerV2.git
