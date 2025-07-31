@@ -498,5 +498,5 @@ def main(args):
 
 if __name__ == "__main__":
     args = parse_args()
-    args.index = 1  # Set index to 0 for testing purposes
+    args.index = 0  # Set index to 0 for testing purposes
     main(args)
