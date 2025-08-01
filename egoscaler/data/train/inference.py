@@ -22,13 +22,15 @@ from models.SpaTrackV2.models.vggt4track.utils.load_fn import preprocess_image
 from models.SpaTrackV2.models.vggt4track.utils.pose_enc import (
     pose_encoding_to_extri_intri,
 )
+from egoscaler.configs import CameraConfig as camera_cfg, DataConfig as data_cfg
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--track_mode", type=str, default="offline")
     parser.add_argument("--data_type", type=str, default="RGBD")
-    parser.add_argument("--data_dir", type=str, default="assets/example0")
+    parser.add_argument("--data_dir", type=str, default="assets/example0/videos")
+    parser.add_argument("--mask_dir", type=str, default="assets/example0/masks")
     parser.add_argument("--video_name", type=str, default="snowboard")
     parser.add_argument("--grid_size", type=int, default=10)
     parser.add_argument("--vo_points", type=int, default=756)
@@ -41,7 +43,7 @@ if __name__ == "__main__":
     out_dir = args.data_dir + "/results"
     # fps
     fps = int(args.fps)
-    mask_dir = args.data_dir + f"/{args.video_name}.png"
+    mask_dir = args.mask_dir + f"/{args.video_name}.png"
 
     vggt4track_model = VGGT4Track.from_pretrained("Yuxihenry/SpatialTrackerV2_Front")
     vggt4track_model.eval()
@@ -70,7 +72,10 @@ if __name__ == "__main__":
         video_tensor = video_tensor[::fps].float()
 
         # process the image tensor
-        video_tensor = preprocess_image(video_tensor)[None]
+        pinhole_image_size = camera_cfg.devices.aria.pinhole_image_size
+        video_tensor = preprocess_image(video_tensor, target_size=pinhole_image_size)[
+            None
+        ]
         with torch.no_grad():
             with torch.cuda.amp.autocast(dtype=torch.bfloat16):
                 # Predict attributes including cameras, depth maps, and point maps.
@@ -115,8 +120,8 @@ if __name__ == "__main__":
     else:
         model = Predictor.from_pretrained("Yuxihenry/SpatialTrackerV2-Online")
 
-    # config the model; the track_num is the number of points in the grid
-    model.spatrack.track_num = args.vo_points
+    # # config the model; the track_num is the number of points in the grid
+    # model.spatrack.track_num = args.vo_points
 
     model.eval()
     model.to("cuda")
@@ -176,7 +181,7 @@ if __name__ == "__main__":
 
         # resize the results to avoid too large I/O Burden
         # depth and image, the maximum side is 336
-        max_size = 336
+        max_size = camera_cfg.devices.aria.pinhole_image_size
         h, w = video.shape[2:]
         scale = min(max_size / h, max_size / w)
         if scale < 1:
@@ -218,6 +223,8 @@ if __name__ == "__main__":
         data_npz_load["video"] = (video_tensor).cpu().numpy() / 255
         data_npz_load["visibs"] = vis_pred.cpu().numpy()
         data_npz_load["unc_metric"] = conf_depth.cpu().numpy()
+        data_npz_load["tracks3d"] = track3d_pred.cpu().numpy()
+        data_npz_load["tracks2d"] = track2d_pred.cpu().numpy()
         np.savez(os.path.join(out_dir, f"result.npz"), **data_npz_load)
 
         print(
